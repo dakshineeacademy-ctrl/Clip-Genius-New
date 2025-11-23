@@ -377,8 +377,26 @@ const Editor: React.FC<EditorProps> = ({ videoUrl, clips, onReset, onExportCheck
           </div>
           
           <div className="p-6 space-y-6">
+
+             {/* Live Style Preview Box */}
+             <div>
+                <label className="text-sm font-medium text-gray-300 mb-3 block">Live Style Preview</label>
+                <div className="w-full h-32 bg-dark-900 rounded-lg border border-dark-600 relative overflow-hidden flex items-center justify-center shadow-inner">
+                    {/* Abstract Background to simulate video contrast */}
+                    <div className="absolute inset-0 bg-gradient-to-tr from-brand-900/20 to-blue-900/20"></div>
+                    <div className="absolute inset-0" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, rgba(255,255,255,0.05) 1px, transparent 0)', backgroundSize: '16px 16px' }}></div>
+                    
+                    {/* Render the styled text using currentTemplate classes */}
+                    <div className="relative z-10 p-4 text-center">
+                      <span className={currentTemplate.textClass}>
+                        Viral Caption
+                      </span>
+                    </div>
+                </div>
+            </div>
+
             <div>
-              <label className="text-sm font-medium text-gray-300 mb-3 block">Caption Style</label>
+              <label className="text-sm font-medium text-gray-300 mb-3 block">Caption Templates</label>
               <div className="grid grid-cols-2 gap-3">
                 {TEMPLATES.map((tpl) => (
                   <button
@@ -404,7 +422,7 @@ const Editor: React.FC<EditorProps> = ({ videoUrl, clips, onReset, onExportCheck
             </div>
 
             <div className="p-4 bg-dark-700/50 rounded-xl border border-dark-600">
-                <h3 className="text-sm font-medium text-white mb-2">Caption Preview</h3>
+                <h3 className="text-sm font-medium text-white mb-2">Caption Timeline</h3>
                 <div className="space-y-2">
                     {currentClip?.captions.slice(0, 3).map((cap, i) => (
                         <div key={i} className="flex justify-between text-xs text-gray-400 italic border-l-2 border-dark-500 pl-2">

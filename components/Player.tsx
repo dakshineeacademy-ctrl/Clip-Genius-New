@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { VideoClip, Template } from '../types';
-import { Play, Pause, Volume2, VolumeX, Maximize2 } from 'lucide-react';
+import { Play, Pause, Volume2, VolumeX } from 'lucide-react';
 
 interface PlayerProps {
   videoUrl: string;
@@ -12,11 +12,14 @@ interface PlayerProps {
 
 const Player: React.FC<PlayerProps> = ({ videoUrl, clip, template, isPlaying, onPlayPause }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const requestRef = useRef<number>(0);
+  
   const [currentTime, setCurrentTime] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
   const [progress, setProgress] = useState(0);
   const [currentCaption, setCurrentCaption] = useState<string>("");
 
+  // Handle Play/Pause commands
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
@@ -28,47 +31,72 @@ const Player: React.FC<PlayerProps> = ({ videoUrl, clip, template, isPlaying, on
     }
   }, [isPlaying]);
 
+  // Reset state when clip changes
   useEffect(() => {
     const video = videoRef.current;
     if (!video || !clip) return;
 
-    // Jump to start time when clip changes
+    // Initialize to start of clip
     video.currentTime = clip.startTime;
     setCurrentTime(clip.startTime);
-    video.play().then(() => onPlayPause && !isPlaying && onPlayPause()).catch(() => {});
+    setProgress(0);
+    setCurrentCaption("");
     
-    // Auto-loop logic
-    const handleTimeUpdate = () => {
-      if (!clip) return;
-      setCurrentTime(video.currentTime);
-      
-      const duration = clip.endTime - clip.startTime;
-      const elapsed = video.currentTime - clip.startTime;
-      setProgress((elapsed / duration) * 100);
+    // Auto-play is handled by parent setting isPlaying=true, 
+    // but if we switch clips while playing, the first effect handles the play() call.
+  }, [clip?.id]); // Only run when clip ID changes
 
-      // Loop
-      if (video.currentTime >= clip.endTime) {
+  // High-precision Sync Loop (replacing timeupdate)
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !clip) return;
+
+    const animate = () => {
+      const now = video.currentTime;
+      setCurrentTime(now);
+
+      // 1. Calculate Progress
+      const duration = clip.endTime - clip.startTime;
+      const elapsed = now - clip.startTime;
+      // Clamp between 0 and 100
+      const progressPercent = Math.max(0, Math.min(100, (elapsed / duration) * 100));
+      setProgress(progressPercent);
+
+      // 2. Loop Logic
+      // Check if we passed the end time
+      if (now >= clip.endTime) {
         video.currentTime = clip.startTime;
+        // Don't return, let the next lines render the start state immediately for smoothness
       }
 
-      // Precise Caption Sync
-      const relativeTime = video.currentTime - clip.startTime;
+      // 3. Precise Caption Sync
+      const relativeTime = now - clip.startTime;
+      
+      // Find the caption where the current relative time falls strictly within start/end
       const activeCaption = clip.captions.find(
         c => relativeTime >= c.start && relativeTime <= c.end
       );
-      
+
       if (activeCaption) {
         setCurrentCaption(activeCaption.text);
       } else {
         setCurrentCaption("");
       }
+
+      // Schedule next frame if playing
+      if (isPlaying) {
+        requestRef.current = requestAnimationFrame(animate);
+      }
     };
 
-    video.addEventListener('timeupdate', handleTimeUpdate);
-    return () => {
-      video.removeEventListener('timeupdate', handleTimeUpdate);
-    };
-  }, [clip]); // Dependency on clip ID to reset
+    if (isPlaying) {
+      requestRef.current = requestAnimationFrame(animate);
+    } else {
+      cancelAnimationFrame(requestRef.current);
+    }
+
+    return () => cancelAnimationFrame(requestRef.current);
+  }, [isPlaying, clip]);
 
   const toggleMute = () => {
     if (videoRef.current) {
@@ -96,7 +124,7 @@ const Player: React.FC<PlayerProps> = ({ videoUrl, clip, template, isPlaying, on
 
       {/* Captions Overlay */}
       {currentCaption && (
-        <div className={`absolute pointer-events-none transition-all duration-100 ${template.containerClass}`}>
+        <div className={`absolute pointer-events-none transition-all duration-75 ${template.containerClass}`}>
           <div className={`${template.textClass}`}>
             {currentCaption}
           </div>
@@ -108,7 +136,7 @@ const Player: React.FC<PlayerProps> = ({ videoUrl, clip, template, isPlaying, on
         {/* Progress Bar */}
         <div className="w-full h-1 bg-gray-600 rounded-full mb-4 overflow-hidden">
           <div 
-            className="h-full bg-brand-500 transition-all duration-100"
+            className="h-full bg-brand-500 transition-all duration-75 ease-linear"
             style={{ width: `${progress}%` }}
           />
         </div>
